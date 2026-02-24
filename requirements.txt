@@ -1,0 +1,6 @@
+panel>=1.6
+holoviews
+pandas
+numpy
+plotly>=5.18
+openpyxl
