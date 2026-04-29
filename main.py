@@ -107,6 +107,34 @@ def save_state(lci_file: Path):
 # ---------------------------
 # Main workflow
 # ---------------------------
+def select_backend() -> str:
+    root = tk.Tk()
+    root.title("Select LCA Backend")
+
+    tk.Label(root, text="Select the LCA backend to use:", padx=10, pady=10).pack()
+
+    selected = tk.StringVar(value="openlca")
+
+    for value, label in [("openlca", "OpenLCA  (requires running IPC server)"),
+                          ("brightway", "Brightway  (fully in-process, no external server)")]:
+        tk.Radiobutton(root, text=label, variable=selected, value=value, anchor="w").pack(
+            fill="x", padx=20, pady=2
+        )
+
+    result = {"backend": None}
+
+    def confirm():
+        result["backend"] = selected.get()
+        root.destroy()
+
+    tk.Button(root, text="Confirm", command=confirm, width=15).pack(pady=(10, 15))
+    root.mainloop()
+
+    if result["backend"] is None:
+        raise ValueError("No backend selected.")
+    return result["backend"]
+
+
 def main():
     setup_logging()
     logging.info("=== Program started ===")
@@ -121,11 +149,12 @@ def main():
 
         # Step 2: Run calculations if needed
         if lci_file_modified(lci_file):
-            logging.info("LCI changed → recalculating")
-            run_calculation.main(lci_file, out_dir)  # pass paths in
+            backend = select_backend()
+            logging.info("LCI changed → recalculating with backend: %s", backend)
+            run_calculation.main(lci_file, out_dir, backend=backend)
             save_state(lci_file)
         else:
-            logging.info("LCI unchanged → using cached results")
+            logging.info("LCI file unchanged → using cached results")
 
         # Step 3: Launch dashboard
         logging.info("Launching report")
