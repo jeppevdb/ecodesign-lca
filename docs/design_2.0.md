@@ -1,6 +1,7 @@
 # Tool 2.0 – agreed design
 
-Status: design agreed step by step with the project owner; no 2.0 code written yet.
+Status: design agreed step by step with the project owner. Build step 1 (data model,
+project file, validation rules) is implemented in `lca4pd/model` with tests in `tests/`.
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -20,7 +21,7 @@ template as the place of data entry, the tkinter file picker. No importer for 1.
 ## 2. Technology
 
 - Panel (Python) for everything; the modelling steps are added to the same app as the report.
-- A project is one local file (SQLite proposed). It stores **references** to datasets only,
+- A project is one local SQLite file. It stores **references** to datasets only,
   never impact factors, plus cached results so the report opens without the database files.
 - Excel is export-only (full LCI table, result tables).
 
@@ -265,7 +266,6 @@ Sections for switched-off options are hidden.
 - Source and bundling of the EF 3.1 normalisation/weighting factors and the
   characterisation-factor list (licence check pending for the latter).
 - Exact pick-lists for GHG Protocol categories and EN 15804 modules.
-- Project file format (SQLite proposed, not yet confirmed).
 
 ## 13. Later, kept in mind in the data model
 
@@ -303,3 +303,21 @@ Sections for switched-off options are hidden.
 5. Scenarios, design alternatives, overview table.
 6. Report generalised to the tree and to EF 3.1.
 7. Classification views and data-quality notes.
+
+## 16. Choices made while building step 1
+
+These go beyond what was discussed and are open to change.
+
+- **Scope:** removing the distribution, use or end-of-life stage from the project switches
+  off the matching questions and checks (e.g. a cradle-to-gate study).
+- **Documented exclusion** is also accepted in place of a supplier pathway, of an
+  end-of-life pathway for a whole element, and of the pathway for an element's own weight.
+- **Weight check:** warns when raw-material inputs add up to less than 90 % or more than
+  150 % of the element's own weight. **Cost check:** tolerance 0.5 %.
+- **Pedigree:** five indicators scored 1–5 (reliability, completeness, temporal,
+  geographical, technological). The 1.0 template's sixth column is not carried over.
+- **Internal numbers:** the same number on elements with different names is flagged;
+  the same number on same-named elements is treated as deliberate reuse.
+- **Copying an element** does not copy its design alternatives.
+- Weights are in kg; prices in the project currency (default EUR).
+- Pick-lists: GHG Protocol scope 1, 2 and 3.1–3.15; EN 15804 modules A1–A5, B1–B7, C1–C4, D.
