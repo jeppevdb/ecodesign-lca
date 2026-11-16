@@ -1,0 +1,43 @@
+# IdeMat (TU Delft / Sustainability Impact Metrics). The workbook gives EF 3.1
+# only as normalised-and-weighted points per category, so characterised values
+# are calculated back from them.
+id = "idemat"
+title = "IdeMat (midpoints sheet)"
+value_mode = "weighted_points"
+sheet = "midpoints"
+
+[method]
+label = "EF 3.1"
+extent = "until_blank"     # the block runs until the first column without a heading
+single_score = ["EF 3.1 Total Pt"]
+
+[columns]
+key = { column = "A", regex = "^(\\S+)" }            # full code including the date
+name = [{ column = "A", regex = "^\\S+\\s+(.*)$" }]
+unit = { column = "E" }
+relink_key = { column = "C" }                        # short code, stable across versions
+category = [{ column = "B" }, { column = "D" }]
+
+# IdeMat's own carbon footprint column, used to check the back-calculation.
+[[compare]]
+category = "climate_change"
+column = "G"
+tolerance = 0.01
+
+[categories]
+acidification = ["Acidification Pt"]
+climate_change = ["Climate change Pt"]
+ecotoxicity_freshwater = ["Ecotoxicity freshwater Pt"]
+particulate_matter = ["Particulate matter Pt"]
+eutrophication_marine = ["Eutrophication, marine Pt"]
+eutrophication_freshwater = ["Eutrophication, freshwater Pt"]
+eutrophication_terrestrial = ["Eutrophication, terrestrial Pt"]
+human_toxicity_cancer = ["Human toxicity, cancer Pt"]
+human_toxicity_non_cancer = ["Human toxicity, non-cancer non-cancer Pt", "Human toxicity, non-cancer Pt"]
+ionising_radiation = ["Ionising radiation Pt"]
+land_use = ["Land use Pt"]
+ozone_depletion = ["Ozone depletion Pt"]
+photochemical_ozone_formation = ["Photochemical ozone formation Pt"]
+resource_use_fossils = ["Resource use, fossils Pt"]
+resource_use_minerals_metals = ["Resource use, minerals+metals Pt", "Resource use, minerals and metals Pt"]
+water_use = ["Water use Pt"]

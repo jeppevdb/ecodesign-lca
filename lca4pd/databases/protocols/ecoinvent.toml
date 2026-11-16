@@ -1,0 +1,35 @@
+# ecoinvent "Cumulative LCIA" workbook (one row per dataset, one column per
+# indicator). Written from public descriptions of the file and NOT yet tested
+# on a real file: run `python -m lca4pd.databases inspect <file>` to check it.
+id = "ecoinvent"
+title = "ecoinvent (cumulative LCIA workbook)"
+value_mode = "characterised"
+sheet = "LCIA"
+
+[method]
+label = "EF v3.1"
+extent = "filled"
+
+[columns]
+key = { labels = ["Activity UUID_Product UUID", "Activity UUID & Product UUID"] }
+name = [{ labels = ["Activity Name"] }, { labels = ["Reference Product Name", "Product Name"] }]
+unit = { labels = ["Reference Product Unit", "Unit"] }
+location = { labels = ["Geography"] }
+
+[categories]
+acidification = ["acidification"]
+climate_change = ["climate change"]
+ecotoxicity_freshwater = ["ecotoxicity: freshwater"]
+particulate_matter = ["particulate matter formation"]
+eutrophication_marine = ["eutrophication: marine"]
+eutrophication_freshwater = ["eutrophication: freshwater"]
+eutrophication_terrestrial = ["eutrophication: terrestrial"]
+human_toxicity_cancer = ["human toxicity: carcinogenic"]
+human_toxicity_non_cancer = ["human toxicity: non-carcinogenic"]
+ionising_radiation = ["ionising radiation: human health"]
+land_use = ["land use"]
+ozone_depletion = ["ozone depletion"]
+photochemical_ozone_formation = ["photochemical oxidant formation: human health", "photochemical ozone formation: human health"]
+resource_use_fossils = ["energy resources: non-renewable"]
+resource_use_minerals_metals = ["material resources: metals/minerals"]
+water_use = ["water use"]

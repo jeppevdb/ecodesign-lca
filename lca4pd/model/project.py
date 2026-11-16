@@ -342,8 +342,27 @@ class Project:
             self.conn.execute("DELETE FROM dataset_ref WHERE database_id = ?", (database_id,))
             self.conn.execute("DELETE FROM database WHERE id = ?", (database_id,))
 
+    def update_database(self, database_id: int, *, version=None, protocol=None,
+                        file_hash=None, coverage: dict | None = None) -> None:
+        """Point a project database at another file (see ``databases.link.replace``)."""
+        self._row("database", database_id)
+        self._update("database", database_id, {
+            "version": version, "protocol": protocol, "file_hash": file_hash,
+            "coverage": json.dumps(coverage or {}),
+        })
+
+    def list_dataset_refs(self, database_id: int) -> list[dict]:
+        return self._rows("SELECT * FROM dataset_ref WHERE database_id = ? ORDER BY id",
+                          (database_id,))
+
+    def update_dataset_ref(self, ref_id: int, **fields) -> None:
+        self._only(fields, ("dataset_key", "name", "unit", "location", "relink_key", "missing"),
+                   "dataset reference")
+        self.get_dataset_ref(ref_id)
+        self._update("dataset_ref", ref_id, fields)
+
     def dataset_ref(self, database_id: int, dataset_key: str, *, name: str, unit: str,
-                    location: str | None = None) -> int:
+                    location: str | None = None, relink_key: str | None = None) -> int:
         """Return the id of the reference to a dataset, creating it if new."""
         self._row("database", database_id)
         existing = self._rows(
@@ -358,6 +377,7 @@ class Project:
             "name": _text(name, "name", required=True),
             "unit": _text(unit, "unit", required=True),
             "location": _text(location, "location"),
+            "relink_key": _text(relink_key, "relink_key"),
         })
 
     def get_dataset_ref(self, ref_id: int) -> dict:

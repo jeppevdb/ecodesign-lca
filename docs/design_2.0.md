@@ -1,7 +1,8 @@
 # Tool 2.0 – agreed design
 
-Status: design agreed step by step with the project owner. Build step 1 (data model,
-project file, validation rules) is implemented in `lca4pd/model` with tests in `tests/`.
+Status: design agreed step by step with the project owner. Build steps 1 (data model,
+project file, validation rules; `lca4pd/model`) and 2 (database import; `lca4pd/databases`,
+`lca4pd/method`) are implemented, with tests in `tests/`.
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -321,3 +322,35 @@ These go beyond what was discussed and are open to change.
 - **Copying an element** does not copy its design alternatives.
 - Weights are in kg; prices in the project currency (default EUR).
 - Pick-lists: GHG Protocol scope 1, 2 and 3.1–3.15; EN 15804 modules A1–A5, B1–B7, C1–C4, D.
+
+## 17. Build step 2 – database import, as built
+
+- **Formats** are TOML files in `lca4pd/databases/protocols/` (BAFU, IdeMat, ecoinvent).
+  Columns are found by heading text, not position. The EF 3.1 flow list has its own reader.
+  `.xlsx` and `.ods` are both read. Needs Python 3.11 or newer.
+- **Library:** imported factors are stored in a local SQLite file outside the project
+  (`Library(directory)`), shared by all projects on the machine. A project refers to a
+  database by the fingerprint of the uploaded file. If the file is not in the library the
+  missing-items check reports the blocker `database_not_loaded`.
+- **Datasets are picked, never typed** (`link.pick`); search covers name, location,
+  category and identifier, and can be limited to a kind of unit.
+- **Replacing a database** re-links by identifier, then by the version-independent code
+  where the database has one (IdeMat short code). Datasets that are gone or changed to
+  another kind of unit are marked missing.
+- **Left out on import, and reported:** rows with text in place of numbers, datasets
+  without any EF 3.1 result, datasets without a unit, and identifiers that occur twice.
+- **Coverage:** a category that is non-zero for fewer than 10 % of datasets counts as not
+  covered, fewer than 50 % as partly covered.
+- **Elementary flows:** country-specific factors are skipped; every flow that has them
+  also has a global factor, which is used.
+- **EF 3.1 normalisation and weighting factors** are bundled in `lca4pd/method/ef31.py`
+  (public JRC reference values). Climate change was verified against IdeMat's data and
+  four further normalisation factors against published tables; the JRC site could not be
+  reached from the development session, so the remaining values should be checked once
+  against the JRC source.
+- **ecoinvent:** the protocol follows the publicly described layout and is not verified.
+  Check a real file with `python -m lca4pd.databases inspect <file>`; if it is not
+  recognised the command prints the file's headings without data.
+
+Measured on the supplied files: BAFU 11,824 datasets read in 5 s; IdeMat 2,633 in 3 s;
+EF 3.1 flow list 89,070 flows in about 1 minute; library size 61 MB; search under 0.1 s.

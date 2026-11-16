@@ -46,6 +46,7 @@ CREATE TABLE dataset_ref (
     name        TEXT NOT NULL,
     unit        TEXT NOT NULL,
     location    TEXT,
+    relink_key  TEXT,                -- version-independent code, if the database has one
     missing     INTEGER NOT NULL DEFAULT 0,
     UNIQUE (database_id, dataset_key)
 );

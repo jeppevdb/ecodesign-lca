@@ -1,0 +1,39 @@
+# BAFU / UVEK LCI data – "LCIA Results" workbook published by the Swiss
+# Federal Office for the Environment. Values are characterised results.
+id = "bafu"
+title = "BAFU (LCIA results workbook)"
+value_mode = "characterised"
+sheet = "^BAFU"
+
+[method]
+label = "EF 3.1"
+extent = "filled"          # the method name sits above the first of its columns
+
+[columns]
+key = { labels = ["Product"] }
+name = [{ labels = ["Product"] }]
+unit = { labels = ["Unit"] }
+location = { labels = ["Product"], regex = " - ([^-]+)$" }
+category = [{ labels = ["Category"] }, { labels = ["Sub-category"] }]
+
+[version]
+sheet = "Info"
+label = "Version"
+
+[categories]
+acidification = ["Acidification [mol H+ eq]"]
+climate_change = ["Climate change [kg CO2 eq]"]
+ecotoxicity_freshwater = ["Ecotoxicity freshwater [CTUe]"]
+particulate_matter = ["Particulate matter [disease incidence]"]
+eutrophication_marine = ["Eutrophication marine [kg N eq]"]
+eutrophication_freshwater = ["Eutrophication freshwater [kg P eq]"]
+eutrophication_terrestrial = ["Eutrophication terrestrial [mol N eq]"]
+human_toxicity_cancer = ["Human toxicity cancer [CTUh]"]
+human_toxicity_non_cancer = ["Human toxicity non-cancer [CTUh]"]
+ionising_radiation = ["Ionising radiation (human health) [kBq U235 eq]"]
+land_use = ["Land use [dimensionless (pt)]"]
+ozone_depletion = ["Ozone depletion [kg CFC11 eq]"]
+photochemical_ozone_formation = ["Photochemical ozone formation (human health) [kg NMVOC eq]"]
+resource_use_fossils = ["Resource use fossils [MJ (net calorific)]"]
+resource_use_minerals_metals = ["Resource use minerals and metals [kg Sb eq]"]
+water_use = ["Water use [m3 world eq]"]

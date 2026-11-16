@@ -41,9 +41,22 @@ def has_blockers(issues: list[Issue]) -> bool:
     return any(issue.severity == BLOCKER for issue in issues)
 
 
-def check_project(project) -> list[Issue]:
-    """All open items of a project, blockers first."""
+def check_project(project, library=None) -> list[Issue]:
+    """All open items of a project, blockers first.
+
+    With a ``library`` the check also reports databases whose file is not
+    loaded on this machine.
+    """
     issues = _Checker(project).run()
+    if library is not None:
+        for database in project.list_databases():
+            if not library.has(database["file_hash"]):
+                issues.append(Issue(
+                    BLOCKER, "database_not_loaded",
+                    f"Upload the file of database '{database['name']}'"
+                    + (f" (version {database['version']})" if database["version"] else "")
+                    + "; its impact factors are not on this computer.",
+                    "database", database["id"]))
     return sorted(issues, key=lambda issue: issue.severity != BLOCKER)
 
 
@@ -486,7 +499,13 @@ class _Checker:
                           f"Values of database '{database['name']}' are calculated back from "
                           "weighted scores.", "database", database["id"])
             missing = coverage.get("missing_categories") or []
-            if missing:
+            partial = coverage.get("partial_categories") or []
+            if missing or partial:
+                parts = []
+                if missing:
+                    parts.append(f"does not cover {', '.join(missing)}")
+                if partial:
+                    parts.append(f"only partly covers {', '.join(partial)}")
                 self.warn("database_coverage",
-                          f"Database '{database['name']}' does not cover: "
-                          f"{', '.join(missing)}.", "database", database["id"])
+                          f"Database '{database['name']}' {' and '.join(parts)}.",
+                          "database", database["id"])
