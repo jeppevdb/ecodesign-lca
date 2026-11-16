@@ -1,8 +1,9 @@
 # Tool 2.0 – agreed design
 
 Status: design agreed step by step with the project owner. Build steps 1 (data model,
-project file, validation rules; `lca4pd/model`) and 2 (database import; `lca4pd/databases`,
-`lca4pd/method`) are implemented, with tests in `tests/`.
+project file, validation rules; `lca4pd/model`), 2 (database import; `lca4pd/databases`,
+`lca4pd/method`) and 3 (calculation; `lca4pd/calculation`) are implemented, with tests in
+`tests/`.
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -22,8 +23,9 @@ template as the place of data entry, the tkinter file picker. No importer for 1.
 ## 2. Technology
 
 - Panel (Python) for everything; the modelling steps are added to the same app as the report.
-- A project is one local SQLite file. It stores **references** to datasets only,
-  never impact factors, plus cached results so the report opens without the database files.
+- A project is one local SQLite file. It stores **references** to datasets only, never
+  impact factors. Results are saved in a separate file next to it, so the report opens
+  without the database files and the project file can be shared without any impact data.
 - Excel is export-only (full LCI table, result tables).
 
 ## 3. Step 0 – Project and calculation setup
@@ -354,3 +356,35 @@ These go beyond what was discussed and are open to change.
 
 Measured on the supplied files: BAFU 11,824 datasets read in 5 s; IdeMat 2,633 in 3 s;
 EF 3.1 flow list 89,070 flows in about 1 minute; library size 61 MB; search under 0.1 s.
+
+## 18. Build step 3 – calculation, as built
+
+`calculate(project, library)` refuses to run while there are blockers, then returns:
+
+- **inventory** – one row per entry or pathway leg, per run, scaled to one product, with
+  the element it is attributed to, its place in the tree, stage, dataset, amount,
+  classification fields, the 16 characterised results and the single score. This is the
+  "as calculated" view.
+- **costs** – the price of every element per run (when cost is switched on).
+- **nodes** and **exclusions** – the tree, and everything deliberately left out with reasons.
+
+Runs: every design × best/average/worst × every market, plus best and worst of each
+scenario on its own for the base design (their average is the base average run).
+
+Choices made while building it:
+
+- **Supplier transport** is counted in the Raw materials stage (Manufacturing if that
+  stage was removed).
+- **Weight parameters** scale the weight entered on an element; totals, transport and
+  end-of-life follow.
+- **Cost:** entered prices stay authoritative. A change below an element (alternative,
+  removed part, price parameter) is carried upwards as a difference. A price parameter
+  scales the whole price of the element it is linked to.
+- **Results file:** separate from the project (see section 2), with a fingerprint of the
+  project so the report can tell when results are out of date.
+- After a calculation, scenarios whose best case scores higher than their worst case are
+  listed (`Results.scenario_direction_warnings`).
+
+Checked against a lamp example worked out by hand (`tests/test_calculation.py`). A product
+with 249 elements, 800 entries, 16 designs, 3 markets and 10 scenarios (204 runs) takes
+about 3 seconds.
