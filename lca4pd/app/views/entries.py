@@ -4,8 +4,8 @@ import pandas as pd
 import panel as pn
 
 from ...model.classifications import ENTRY_TYPE_LABELS
-from ..components import (ClassificationFields, DatasetField, W, alert, guarded, note, table,
-                          unit_select)
+from ..components import (ClassificationFields, DatasetField, W, alert, answer, guarded,
+                          note, question, table, unit_select)
 
 _HELP = {
     "production_input": "A material, component, energy or service that goes into making this "
@@ -52,8 +52,8 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
         default = entry.get("stage_id")
         if default is None and entry_type != "production_input":
             default = next((s["id"] for s in allowed if s["role"] == "manufacturing"), None)
-        stage = W.RadioBoxGroup(options={s["name"]: s["id"] for s in allowed}, value=default,
-                                inline=True)
+        stage = question({s["name"]: s["id"] for s in allowed}, default, inline=True,
+                         unanswered="Not chosen yet")
         parts.append(pn.Column(pn.pane.Markdown("**Life-cycle stage**", margin=(5, 10, 0, 10)),
                                stage))
 
@@ -145,7 +145,7 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
         if amount is not None:
             fields["amount"] = amount.value
         if stage is not None:
-            fields["stage_id"] = stage.value
+            fields["stage_id"] = answer(stage)
         if classification is not None:
             fields.update(classification.values())
         per_market = entry_type == "use" and use_kind.value == "markets"

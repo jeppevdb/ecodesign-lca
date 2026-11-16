@@ -58,6 +58,24 @@ def confirm_button(label: str, on_confirm, button_type: str = "danger", **kwargs
     return button
 
 
+UNANSWERED = ""
+
+
+def question(options: dict, value, inline: bool = False, unanswered: str = "Not answered yet"):
+    """Radio buttons for a question that starts unanswered.
+
+    A plain radio group silently selects its first option; this one shows
+    "not answered yet" until the user chooses. Read it with ``answer()``.
+    """
+    return W.RadioBoxGroup(options={unanswered: UNANSWERED, **options},
+                           value=value if value in options.values() else UNANSWERED,
+                           inline=inline)
+
+
+def answer(widget):
+    return None if widget.value == UNANSWERED else widget.value
+
+
 def guarded(session, action, message_area=None):
     """Run a change; show a refused input next to the form instead of failing."""
     try:

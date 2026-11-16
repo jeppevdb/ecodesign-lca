@@ -4,7 +4,8 @@ import pandas as pd
 import panel as pn
 
 from ...model.tree import Tree
-from ..components import W, alert, card, confirm_button, guarded, heading, note, table
+from ..components import (W, alert, answer, card, confirm_button, guarded, heading, note,
+                          question, table)
 from .entries import entries_panel
 from .pathways import new_pathway_form
 
@@ -108,8 +109,8 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
     # ---- question 1: where is it produced
     site = None
     if asks["production_site"]:
-        site = W.RadioBoxGroup(options={"On our own site": "on_site", "At a supplier": "supplier"},
-                               value=node.get("production_site"), inline=True)
+        site = question({"On our own site": "on_site", "At a supplier": "supplier"},
+                        node.get("production_site"), inline=True)
         supplier, supplier_reason, supplier_view = pathway_select(
             "supplier", node.get("supplier_pathway_id"), node.get("supplier_exclusion_reason"),
             "Transport from the supplier to us")
@@ -127,11 +128,10 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
     # ---- question 2: end-of-life
     eol = None
     if asks["eol"]:
-        eol = W.RadioBoxGroup(
-            options={"Yes – one pathway for the whole element": "whole",
-                     "No – decide for each sub-element": "split",
-                     "Leave end-of-life out, with a reason": "excluded"},
-            value=node.get("eol_mode"))
+        eol = question({"Yes – one pathway for the whole element": "whole",
+                        "No – decide for each sub-element": "split",
+                        "Leave end-of-life out, with a reason": "excluded"},
+                       node.get("eol_mode"))
         whole, _, whole_view = pathway_select("eol", node.get("eol_pathway_id"), None,
                                               "End-of-life pathway", allow_exclude=False)
         eol_reason = W.TextInput(name="Reason", value=node.get("eol_exclusion_reason") or "",
@@ -181,13 +181,13 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
         if toggles["cost"]:
             fields["price"] = price.value
         if site is not None:
-            fields["production_site"] = site.value
+            fields["production_site"] = answer(site)
             chosen = (supplier.value or None) if site.value == "supplier" else None
             fields["supplier_pathway_id"] = None if chosen == EXCLUDE else chosen
             fields["supplier_exclusion_reason"] = (supplier_reason.value
                                                    if chosen == EXCLUDE else None)
         if eol is not None:
-            fields["eol_mode"] = eol.value
+            fields["eol_mode"] = answer(eol)
             fields["eol_pathway_id"] = (whole.value or None) if eol.value == "whole" else None
             fields["eol_exclusion_reason"] = eol_reason.value if eol.value == "excluded" else None
             chosen = (own.value or None) if eol.value == "split" else None

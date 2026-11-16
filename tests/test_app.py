@@ -16,6 +16,7 @@ from lca4pd.app.views.entries import entry_form            # noqa: E402
 from lca4pd.app.views.tree import node_form                # noqa: E402
 from lca4pd.databases import link                          # noqa: E402
 from lca4pd.databases.reader import ImportReport, Item, ParsedDatabase   # noqa: E402
+from lca4pd.model import check_project                                 # noqa: E402
 from lca4pd.model.classifications import ENTRY_TYPES, TOGGLES            # noqa: E402
 
 
@@ -145,3 +146,29 @@ def test_calculation_can_be_run_from_the_filled_project(filled):
     filled.goto("calculate")                       # shows the saved results
     assert not isinstance(filled.main[0], pn.pane.Alert)
     assert len(results.inventory) > 0
+
+
+def test_questions_start_unanswered(filled):
+    """Nothing may be answered on the user's behalf just because a form was opened."""
+    project = filled.project
+    form = node_form(filled, parent_id=filled.ids["root"])
+    radios = list(form.select(pn.widgets.RadioBoxGroup))
+    assert len(radios) == 2                                   # production site, end-of-life
+    assert all(radio.value == "" for radio in radios)
+
+    new_input = entry_form(filled, filled.ids["base"], "production_input", None, lambda: None)
+    (stage,) = new_input.select(pn.widgets.RadioBoxGroup)
+    assert stage.value == ""                                  # raw materials or manufacturing
+
+    # An element saved with the questions untouched keeps them open, and is flagged.
+    node = project.add_node(filled.ids["root"], "Shade")
+    existing = node_form(filled, node_id=node)
+    assert all(radio.value == "" for radio in existing.select(pn.widgets.RadioBoxGroup))
+    codes = {issue.code for issue in check_project(project) if issue.target_id == node}
+    assert {"production_site_unanswered", "eol_unanswered"} <= codes
+
+
+def test_answered_questions_are_shown_as_answered(filled):
+    form = node_form(filled, node_id=filled.ids["base"])
+    values = [radio.value for radio in form.select(pn.widgets.RadioBoxGroup)]
+    assert values == ["supplier", "whole"]
