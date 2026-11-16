@@ -11,7 +11,8 @@ import hashlib
 import math
 import re
 import tomllib
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from ..method import ef31
@@ -353,8 +354,7 @@ def read_process_database(path, protocol: Protocol) -> ParsedDatabase:
     compare = [(ef31.CATEGORY_IDS.index(c["category"]), column_index(c["column"]),
                 c.get("tolerance", 0.01)) for c in protocol.compare]
 
-    items: dict[str, Item] = {}
-    duplicates: set[str] = set()
+    rows: list[Item] = []
     counts = dict(non_numeric=0, empty=0, no_unit=0, blanks=0, repaired=0,
                   no_category=0, score_off=0, score_checked=0)
     compare_off = [0] * len(compare)
@@ -380,11 +380,6 @@ def read_process_database(path, protocol: Protocol) -> ParsedDatabase:
             counts["no_unit"] += 1
             continue
 
-        if key in items or key in duplicates:
-            duplicates.add(key)
-            items.pop(key, None)
-            continue
-
         if layout.single_score_column is not None:
             total = as_number(cell(row, layout.single_score_column))
             if total:
@@ -405,15 +400,25 @@ def read_process_database(path, protocol: Protocol) -> ParsedDatabase:
         counts["repaired"] += name != raw_name
         category = _text(row, columns.get("category", []), " / ")
         counts["no_category"] += "category" in columns and category is None
-        items[key] = Item(
+        rows.append(Item(
             key=key, name=name, unit=units.canonical(unit),
             location=_text(row, columns.get("location", []), " "),
             category=repair_text(category) if category else None,
             relink_key=_text(row, columns.get("relink_key", []), " "),
             values=tuple(values),
-        )
+        ))
 
-    result = list(items.values())
+    # An identifier used for several datasets is told apart by adding the name.
+    # Only rows that are still indistinguishable are left out.
+    seen = Counter(item.key for item in rows)
+    shared = {key for key, count in seen.items() if count > 1}
+    rows = [replace(item, key=f"{item.key} | {item.name}") if item.key in shared else item
+            for item in rows]
+    seen = Counter(item.key for item in rows)
+    duplicates = {key for key, count in seen.items() if count > 1}
+    result = [item for item in rows if item.key not in duplicates]
+    shared = {key for key in shared
+              if any(item.key.startswith(f"{key} | ") for item in result)}
     report.datasets = len(result)
     if not result:
         raise ProtocolMismatch("the layout was found but no dataset could be read")
@@ -432,8 +437,13 @@ def read_process_database(path, protocol: Protocol) -> ParsedDatabase:
     if report.derived:
         report.info("Values are calculated back from weighted points with the EF 3.1 "
                     "normalisation and weighting factors.")
+    if shared:
+        report.warn(f"{len(shared)} identifier(s) are used for more than one dataset in the "
+                    "file; those datasets are stored under identifier plus name: "
+                    + ", ".join(sorted(shared)[:10]))
     if duplicates:
-        report.warn(f"{len(duplicates)} dataset key(s) occur more than once and were left out: "
+        report.warn(f"{len(duplicates)} dataset(s) occur more than once with the same "
+                    "identifier and name and were left out: "
                     + ", ".join(sorted(duplicates)[:10]))
     plain = (("non_numeric", "row(s) with text where a number is expected were left out"),
              ("empty", "dataset(s) without any EF 3.1 result were left out"),

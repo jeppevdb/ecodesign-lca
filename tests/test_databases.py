@@ -86,7 +86,10 @@ def idemat_file(tmp_path):
             [None, None, None, "Non-ferro"],
             dataset("B.020.01.101.240101", "Aluminium", 8.0, alu),
             dataset("B.030.01.101.240101", "Twice", 2.0, steel),
-            dataset("B.030.01.101.240101", "Twice", 2.0, steel)]
+            dataset("B.030.01.101.240101", "Twice", 2.0, steel),
+            # a numbering mistake in the file: one code, two different datasets
+            dataset("B.040.01.101.240101", "Copper", 2.0, steel),
+            dataset("B.040.01.101.240101", "Brass", 8.0, alu)]
     return write(tmp_path / "idemat.xlsx", {"Introduction": [["Idemat"]],
                                             "Idemat2026 midpoints": rows})
 
@@ -165,7 +168,7 @@ def test_repair_text_leaves_good_text_alone():
 def test_idemat_points_are_calculated_back(idemat_file):
     assert detect_file(idemat_file) == ["idemat"]
     parsed = read_file(idemat_file)
-    steel, alu = parsed.items
+    steel, alu = parsed.items[:2]
     assert (steel.key, steel.name, steel.unit) == ("B.010.01.101.240101", "Steel", "kg")
     assert steel.relink_key == "B.010.01.101"
     assert steel.values[CC] == pytest.approx(2.0) and alu.values[CC] == pytest.approx(8.0)
@@ -177,7 +180,7 @@ def test_idemat_checks_and_coverage(idemat_file):
     texts = " ".join(text for _, text in report.messages)
     assert "Single score check passed" in texts
     assert "Climate change matches the file's own reference column" in texts
-    assert "1 dataset key(s) occur more than once and were left out" in texts
+    assert "1 dataset(s) occur more than once with the same identifier and name" in texts
     assert report.missing_categories == ["Water use"]
     assert report.coverage["water_use"] == 0 and report.coverage["climate_change"] == 1
 
@@ -188,6 +191,16 @@ def test_idemat_back_calculation_mismatch_is_reported(idemat_file, tmp_path):
     workbook.save(tmp_path / "off.xlsx")
     texts = " ".join(text for _, text in read_file(tmp_path / "off.xlsx").report.messages)
     assert "Climate change differs by more than 1%" in texts
+
+
+def test_shared_identifier_is_told_apart_by_name(idemat_file):
+    parsed = read_file(idemat_file)
+    assert [i.key for i in parsed.items[2:]] == [
+        "B.040.01.101.240101 | Copper", "B.040.01.101.240101 | Brass"]
+    assert [i.values[CC] for i in parsed.items[2:]] == pytest.approx([2.0, 8.0])
+    assert "Twice" not in [i.name for i in parsed.items]      # truly identical rows are dropped
+    texts = " ".join(text for _, text in parsed.report.messages)
+    assert "1 identifier(s) are used for more than one dataset" in texts
 
 
 # --------------------------------------------------------------- ecoinvent
