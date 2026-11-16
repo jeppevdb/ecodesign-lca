@@ -10,6 +10,7 @@ from ...databases import ProtocolMismatch, describe_headings, link, read_file
 from ...method import ef31
 from ..components import W, alert, card, confirm_button, guarded, heading, note, table
 
+ACCEPTED = (".xlsx", ".xlsm", ".ods")
 _KIND = {"process": "Impact factors per dataset", "flow": "Elementary flows (direct emissions)"}
 
 
@@ -104,9 +105,10 @@ def build(session):
         ]
 
     # ------------------------------------------------------------ upload
-    dropper = W.FileDropper(accepted_filetypes=[".xlsx", ".ods"], multiple=False,
-                            max_file_size="1000MB", chunk_size=5_000_000, layout="compact",
-                            sizing_mode="stretch_width")
+    # No file-type filter in the browser: it goes by the type the operating system
+    # reports, which for .xlsx differs between computers. The extension is checked here.
+    dropper = W.FileDropper(multiple=False, max_file_size="1000MB", chunk_size=5_000_000,
+                            layout="compact", sizing_mode="stretch_width")
     busy = pn.indicators.LoadingSpinner(value=False, size=30, visible=False)
     status = pn.pane.Markdown("", margin=(8, 10))
 
@@ -114,6 +116,11 @@ def build(session):
         if not event.new:
             return
         file_name, data = next(iter(event.new.items()))
+        if Path(file_name).suffix.lower() not in ACCEPTED:
+            preview[:] = [alert(f"**{file_name}** is not an Excel (.xlsx) or OpenDocument "
+                                "(.ods) file.")]
+            dropper.value = {}
+            return
         path = session.uploads_dir / Path(file_name).name
         path.write_bytes(data if isinstance(data, bytes) else data.encode())
         preview[:] = []
