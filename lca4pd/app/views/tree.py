@@ -381,7 +381,7 @@ def build(session):
                        else 0, sizing_mode="stretch_width")
         session.focus = {}
         right[:] = [pn.pane.Markdown(f"### {node['name']}\n{path}", margin=(0, 10)),
-                    pn.Row(*actions, *move_row), tabs]
+                    pn.Row(*actions), pn.Row(*move_row), tabs]
 
     def on_change():
         show_tree()
