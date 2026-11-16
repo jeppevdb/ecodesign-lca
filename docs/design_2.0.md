@@ -1,9 +1,9 @@
 # Tool 2.0 – agreed design
 
-Status: design agreed step by step with the project owner. Build steps 1 (data model,
-project file, validation rules; `lca4pd/model`), 2 (database import; `lca4pd/databases`,
-`lca4pd/method`) and 3 (calculation; `lca4pd/calculation`) are implemented, with tests in
-`tests/`.
+Status: design agreed step by step with the project owner. Build steps 1–4 are
+implemented, with tests in `tests/`: data model and checks (`lca4pd/model`), database import
+(`lca4pd/databases`, `lca4pd/method`), calculation (`lca4pd/calculation`) and the guided
+interface up to the calculation (`lca4pd/app`).
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -388,3 +388,34 @@ Choices made while building it:
 Checked against a lamp example worked out by hand (`tests/test_calculation.py`). A product
 with 249 elements, 800 entries, 16 designs, 3 markets and 10 scenarios (204 runs) takes
 about 3 seconds.
+
+## 19. Build step 4 – guided interface, as built
+
+Start with `python -m lca4pd`. One Panel application with a step list and the
+missing-items panel on the left, the current step on the right.
+
+| Step | Screen |
+|---|---|
+| Start | open a project or create one |
+| 1 Setup | project texts, markets, life-cycle stages, optional detail (saved as typed) |
+| 2 Databases | upload with a preview of what was read, use a library database, replace a version |
+| 3 Pathways | distribution per market, supplier pathways, end-of-life pathways with share check |
+| 4 Product and entries | tree on the left; element form with the three questions and the entries on the right |
+| 5 Calculate | enabled once nothing blocks; saves the results file and shows totals |
+
+- Datasets are only ever chosen through the search dialog; amounts take the dataset's unit
+  with a choice of compatible units.
+- A refused input is shown next to the form with the reason; a negative amount asks for
+  confirmation.
+- Supplier and end-of-life pathways can be created from within the element form.
+- Every missing item is a link to the element, entry or pathway where it is fixed; the tree
+  marks each element as complete, worth checking, or still needing something.
+- Optional fields (pedigree, GHG Protocol, EN 15804, price, internal number) appear only
+  when switched on in Setup.
+
+Not in the interface yet: scenarios and parameters, design alternatives, the full LCI
+overview table (all build step 5), and the report (step 6). Design alternatives that exist
+in a project are not shown in the tree yet.
+
+Checked by driving the application in a browser from a new project to a calculated result
+with the real BAFU file, and by tests that build every screen (`tests/test_app.py`).

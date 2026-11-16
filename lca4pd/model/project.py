@@ -112,7 +112,8 @@ class Project:
 
     @staticmethod
     def _connect(path) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(path))
+        # The interface may call from more than one thread of the local server.
+        conn = sqlite3.connect(str(path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
@@ -435,6 +436,27 @@ class Project:
             "kind": kind, "name": name, "market_id": market_id,
             "description": _text(description, "description"),
         })
+
+    def update_pathway(self, pathway_id: int, *, name: str | None = None,
+                       description: str | None = None) -> None:
+        pathway = self._row("pathway", pathway_id)
+        changes = {}
+        if name is not None:
+            name = _text(name, "name", required=True)
+            clash = self._rows("SELECT id FROM pathway WHERE kind = ? AND name = ? AND id != ?",
+                               (pathway["kind"], name, pathway_id))
+            if clash:
+                raise ValidationError(f"A pathway named '{name}' already exists.", "name")
+            changes["name"] = name
+        if description is not None:
+            changes["description"] = _text(description, "description")
+        self._update("pathway", pathway_id, changes)
+
+    def pathway_users(self, pathway_id: int) -> list[dict]:
+        """Elements that use a pathway."""
+        return self._rows(
+            "SELECT * FROM node WHERE ? IN (supplier_pathway_id, eol_pathway_id, eol_own_pathway_id)",
+            (pathway_id,))
 
     def remove_pathway(self, pathway_id: int) -> None:
         self._row("pathway", pathway_id)

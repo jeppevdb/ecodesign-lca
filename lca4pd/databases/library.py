@@ -53,7 +53,7 @@ class Library:
         else:
             Path(directory).mkdir(parents=True, exist_ok=True)
             target = str(Path(directory) / "library.sqlite")
-        self.conn = sqlite3.connect(target)
+        self.conn = sqlite3.connect(target, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         with self.conn:

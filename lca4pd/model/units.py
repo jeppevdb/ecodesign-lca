@@ -116,3 +116,11 @@ def convert(value: float, from_unit: str, to_unit: str) -> float:
     if source == target:
         return value
     return value * _UNITS[source][1] / _UNITS[target][1]
+
+
+def alternatives(unit: str) -> list[str]:
+    """Units an amount may be entered in for a dataset given per ``unit``."""
+    name = canonical(unit)
+    kind = dimension(name)
+    same = [other for other, (other_kind, _) in _UNITS.items() if other_kind == kind]
+    return same or [name]

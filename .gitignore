@@ -9,3 +9,6 @@ __pycache__/
 .idea/
 .DS_Store
 
+
+# local data of the 2.0 tool (never commit databases or projects)
+workspace/

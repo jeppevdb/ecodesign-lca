@@ -85,3 +85,75 @@ EN15804_MODULES = {
     "C4": "C4 – Disposal",
     "D": "D – Benefits and loads beyond the system boundary",
 }
+
+TOGGLE_LABELS = {
+    "uncertainty": ("Assess uncertainty", "Score each entry on the five pedigree indicators."),
+    "ghg_protocol": ("GHG Protocol categories", "Label each entry with its scope category, e.g. scope 3.11."),
+    "en15804": ("EN 15804 modules", "Label each entry with its EPD module, e.g. B2."),
+    "cost": ("Cost", "Enter the price of every element and compare cost with impact."),
+    "internal_numbers": ("Internal numbers", "Record your company's part or assembly numbers."),
+    "scenarios": ("Scenarios", "Define best and worst cases for uncertain assumptions."),
+    "alternatives": ("Design alternatives", "Model alternative designs and compare them with the base."),
+}
+
+ENTRY_TYPE_LABELS = {
+    "production_input": "Production input",
+    "production_waste": "Production waste",
+    "production_emission": "Production emission",
+    "use": "Use",
+    "cost": "Cost",
+    "exclusion": "Documented exclusion",
+}
+
+PATHWAY_KIND_LABELS = {
+    "gate_to_customer": "Distribution to customer",
+    "supplier": "Transport from supplier",
+    "eol": "End-of-life",
+}
+
+PEDIGREE_LABELS = {
+    "reliability": "Reliability",
+    "completeness": "Completeness",
+    "temporal": "Temporal correlation",
+    "geographical": "Geographical correlation",
+    "technological": "Further technological correlation",
+}
+
+# Pedigree matrix descriptors (score 1 = best … 5 = worst)
+PEDIGREE_LEVELS = {
+    "reliability": (
+        "Validated data based on measurements",
+        "Verified data partly based on assumptions, or non-verified data based on measurements",
+        "Non-verified data partly based on qualified estimates",
+        "Qualified estimate (e.g. by an industrial expert)",
+        "Non-qualified estimate",
+    ),
+    "completeness": (
+        "Representative data from all relevant sites over an adequate period",
+        "Representative data from more than 50 % of the relevant sites over an adequate period",
+        "Representative data from only some sites (well below 50 %), or from more than 50 % of sites over shorter periods",
+        "Representative data from only one relevant site, or from some sites over shorter periods",
+        "Representativeness unknown, or data from few sites and shorter periods",
+    ),
+    "temporal": (
+        "Less than 3 years of difference to the time period of the dataset",
+        "Less than 6 years of difference",
+        "Less than 10 years of difference",
+        "Less than 15 years of difference",
+        "Age of data unknown, or more than 15 years of difference",
+    ),
+    "geographical": (
+        "Data from the area under study",
+        "Average data from a larger area that includes the area under study",
+        "Data from an area with similar production conditions",
+        "Data from an area with slightly similar production conditions",
+        "Data from an unknown or distinctly different area",
+    ),
+    "technological": (
+        "Data from the enterprises, processes and materials under study",
+        "Data from the processes and materials under study (identical technology) but from other enterprises",
+        "Data from the processes and materials under study but from different technology",
+        "Data on related processes or materials",
+        "Data on related processes at laboratory scale, or from different technology",
+    ),
+}
