@@ -12,14 +12,14 @@ import panel as pn
 
 from .components import LEFT_STYLE, W
 from .session import Session
-from .views import (calculate, databases, issues, overview, pathways, scenarios, setup, start,
-                    tree)
+from .views import (calculate, databases, issues, overview, pathways, report, scenarios, setup,
+                    start, tree)
 
 ACCENT = "#4099da"
 
 VIEWS = {"start": start.build, "setup": setup.build, "databases": databases.build,
          "pathways": pathways.build, "tree": tree.build, "scenarios": scenarios.build,
-         "overview": overview.build, "calculate": calculate.build}
+         "overview": overview.build, "calculate": calculate.build, "report": report.build}
 
 
 def steps(project) -> list[tuple[str, str]]:
@@ -29,12 +29,12 @@ def steps(project) -> list[tuple[str, str]]:
              ("tree", "Product and entries")]
     if project.toggles["scenarios"]:
         names.append(("scenarios", "Scenarios"))
-    names += [("overview", "Full overview"), ("calculate", "Calculate")]
+    names += [("overview", "Full overview"), ("calculate", "Calculate"), ("report", "Report")]
     return [(step, f"{number}  {label}") for number, (step, label) in enumerate(names, start=1)]
 
 
 def create_app(workspace):
-    pn.extension("tabulator", "filedropper", notifications=True)
+    pn.extension("tabulator", "filedropper", "plotly", notifications=True)
     session = Session(workspace)
     session.views = VIEWS
 

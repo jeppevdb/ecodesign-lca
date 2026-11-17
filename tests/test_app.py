@@ -20,7 +20,8 @@ from lca4pd.model import check_project                                 # noqa: E
 from lca4pd.model.classifications import ENTRY_TYPES, TOGGLES            # noqa: E402
 
 
-STEPS = ["setup", "databases", "pathways", "tree", "scenarios", "overview", "calculate"]
+STEPS = ["setup", "databases", "pathways", "tree", "scenarios", "overview", "calculate",
+         "report"]
 
 
 def shown(session) -> bool:
@@ -188,7 +189,7 @@ def test_steps_follow_the_setup(session):
     session.new_project("P")
     assert [label for _, label in steps(session.project)] == [
         "1  Setup", "2  Databases", "3  Transport and end-of-life pathways",
-        "4  Product and entries", "5  Full overview", "6  Calculate"]
+        "4  Product and entries", "5  Full overview", "6  Calculate", "7  Report"]
     session.project.set_toggle("scenarios", True)
     assert steps(session.project)[4] == ("scenarios", "5  Scenarios")
 

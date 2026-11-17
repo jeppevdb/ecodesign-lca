@@ -87,9 +87,40 @@ def calculate(project, library: Library) -> Results:
         costs=pd.DataFrame(costs, columns=_RUN_COLUMNS + ["node_id", "unit_price", "multiplier", "cost"]),
         nodes=model.node_table(),
         exclusions=model.exclusion_table(),
-        meta={"fingerprint": fingerprint(project), "project": project.get_setting("name"),
-              "currency": project.get_setting("currency")},
+        meta=report_context(project, fingerprint(project)),
     )
+
+
+def report_context(project, project_fingerprint: str) -> dict:
+    """What the report needs besides the numbers, so it opens from the results file alone."""
+    scenarios = []
+    for scenario in project.list_scenarios():
+        scenarios.append({
+            "name": scenario["name"], "description": scenario["description"],
+            "parameters": [{key: parameter[key] for key in (
+                "name", "best", "worst", "assumption_best", "assumption_average",
+                "assumption_worst")} for parameter in project.list_parameters(scenario["id"])],
+        })
+    designs = []
+    for design in project.list_designs():
+        designs.append({"name": design["name"],
+                        "substitutions": [[base, alt] for base, alt in
+                                          design["substitutions"].items()]})
+    return {
+        "fingerprint": project_fingerprint,
+        "project": project.get_setting("name"),
+        "currency": project.get_setting("currency"),
+        "settings": {key: project.get_setting(key)
+                     for key in ("functional_unit", "reference_flow", "scope")},
+        "toggles": project.toggles,
+        "stages": [{"name": s["name"], "role": s["role"]} for s in project.list_stages()],
+        "markets": [{"name": m["name"], "description": m["description"]}
+                    for m in project.list_markets()],
+        "scenarios": scenarios,
+        "designs": designs,
+        "databases": [{key: db[key] for key in ("name", "kind", "version", "coverage")}
+                      for db in project.list_databases()],
+    }
 
 
 _RUN_COLUMNS = ["design", "setting", "market", "varied_scenario"]
@@ -190,6 +221,7 @@ class _Model:
                 "alternative": node["alt_label"], "depth": depth,
                 "level_label": node["level_label"], "internal_number": node["internal_number"],
                 "quantity": node["quantity"], "has_children": node["id"] in self.plain_children,
+                "weight": node["weight"], "price": node["price"],
                 "is_removed": bool(node["is_removed"]),
                 "alt_short_description": node["alt_short_description"],
                 "alt_long_description": node["alt_long_description"],

@@ -1,9 +1,11 @@
 # Tool 2.0 – agreed design
 
-Status: design agreed step by step with the project owner. Build steps 1–5 are
+Status: design agreed step by step with the project owner. Build steps 1–6 are
 implemented, with tests in `tests/`: data model and checks (`lca4pd/model`), database import
-(`lca4pd/databases`, `lca4pd/method`), calculation (`lca4pd/calculation`) and the guided
-interface with scenarios, design alternatives and the full overview (`lca4pd/app`).
+(`lca4pd/databases`, `lca4pd/method`), calculation (`lca4pd/calculation`), the guided
+interface with scenarios, design alternatives and the full overview (`lca4pd/app`), and the
+report (`lca4pd/report`). Version 1 (`main.py`, `impact_report_generation/`,
+`exhaustive_result_calculation/`) is untouched and still runs on its own.
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -453,3 +455,35 @@ Checked in the browser on a demo project: creating a scenario and parameter, lin
 from an entry, creating an alternative and seeing its differences, editing and refusing
 values in the table (also after sorting), a bulk edit of ticked rows after sorting, the
 calculated view and the calculation of all designs, settings and markets.
+
+## 21. Build step 6 – the report, as built
+
+The report is step "Report" in the app, built from the saved results file alone (no
+databases needed). The results file now also carries the project texts, markets, stages,
+scenario assumptions, design descriptions and database notes.
+
+Same structure and chart types as version 1, generalised to a tree of any depth and EF 3.1:
+
+| Tab | Contents |
+|---|---|
+| Quick summary | total; data notes; the elements behind 90 % of the impact **for each level of the tree**; stages; most cost-effective design changes (or largest reductions without cost) |
+| LCA summary | flow of impacts (Sankey, levels adjustable); most relevant elements per market and scenario setting (stacked bars, level selectable); breakdown sunburst (coloured by uncertainty when switched on); tables to download; design summary (cost vs impact scatter) |
+| Reference product | pick **any element**; its parts (sub-elements plus its own processes as a separate slice, or its entries for an element without sub-elements); stages; impact categories (weighted or normalised); breakdown; scenario sensitivity (tornado) with assumptions |
+| Design changes | pick an alternative; summary at element and product level; compared by part; stages; all 16 categories as % of base (radar); breakdowns side by side |
+| GHG Protocol & EN 15804 | climate change by scope category; 16 categories by module; unclassified share shown |
+| About this report | functional unit, scope, markets, stages, method, databases with coverage notes, scenarios with assumptions, what was left out; glossary and chart guide |
+
+Rules:
+- "Own processes" of an element with sub-elements are always a separate slice, so the parts
+  of an element add up to the element.
+- A level of the tree is named after its level label ("level 1 (assembly)") only when every
+  element at that depth has that same label.
+- Shares in "over 90 %" sentences are shares of the positive contributions; credits are
+  listed separately and noted. Sunbursts cannot show credits; the amount left out is stated.
+- All charts are Plotly (version 1 mixed HoloViews and Plotly); all tables download as CSV and
+  Excel.
+- The classification tab states that the breakdowns are not a GHG inventory or an EPD.
+
+Checked against the hand-calculated lamp (`tests/test_report_data.py`), every tab and chart
+built with every selector option (`tests/test_report_views.py`), and in the browser on a demo
+project.

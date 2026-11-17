@@ -30,11 +30,11 @@ def build(session):
         state = (alert("These results are up to date.", "success") if current else
                  alert("The project has changed since these results were calculated. "
                        "Calculate again to update them.", "warning"))
-        return card("Results per product", state, *warnings,
+        open_report = W.Button(name="Open the report", button_type="primary", width=170)
+        open_report.on_click(lambda event: session.goto("report"))
+        return card("Results per product", state, *warnings, open_report,
                     table(frame, height=min(40 + 32 * len(frame), 420)),
-                    note(f"{len(results.inventory):,} inventory rows calculated. The full report "
-                         "is the next part of the tool to be built; until then this table shows "
-                         "the totals."))
+                    note(f"{len(results.inventory):,} inventory rows calculated."))
 
     def show():
         issues = session.issues()
