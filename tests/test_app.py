@@ -20,6 +20,15 @@ from lca4pd.model import check_project                                 # noqa: E
 from lca4pd.model.classifications import ENTRY_TYPES, TOGGLES            # noqa: E402
 
 
+STEPS = ["setup", "databases", "pathways", "tree", "scenarios", "overview", "calculate"]
+
+
+def shown(session) -> bool:
+    """The current screen was built (a failed screen is replaced by a red message)."""
+    view = session.main[0]
+    return getattr(view, "alert_type", None) != "danger"
+
+
 class FakeTemplate:
     def open_modal(self):
         self.open = True
@@ -95,20 +104,20 @@ def test_start_screen_lists_projects(session):
     session.close_project()
     assert [f.stem for f in session.project_files()] == ["Desk_lamp"]
     session.goto("start")
-    assert not isinstance(session.main[0], pn.pane.Alert)
+    assert shown(session)
 
 
-@pytest.mark.parametrize("step", ["setup", "databases", "pathways", "tree", "calculate"])
+@pytest.mark.parametrize("step", STEPS)
 def test_every_step_builds_for_an_empty_project(session, step):
     session.new_project("Empty")
     session.goto(step)
-    assert not isinstance(session.main[0], pn.pane.Alert), session.main[0].object
+    assert shown(session)
 
 
-@pytest.mark.parametrize("step", ["setup", "databases", "pathways", "tree", "calculate"])
+@pytest.mark.parametrize("step", STEPS)
 def test_every_step_builds_for_a_filled_project(filled, step):
     filled.goto(step, node=filled.ids["base"])
-    assert not isinstance(filled.main[0], pn.pane.Alert), filled.main[0].object
+    assert shown(filled)
 
 
 def test_forms_build_for_every_entry_type_new_and_existing(filled):
@@ -144,7 +153,7 @@ def test_calculation_can_be_run_from_the_filled_project(filled):
     results = calculate(filled.project, filled.library)
     results.save(filled.results_path)
     filled.goto("calculate")                       # shows the saved results
-    assert not isinstance(filled.main[0], pn.pane.Alert)
+    assert shown(filled)
     assert len(results.inventory) > 0
 
 
@@ -172,3 +181,53 @@ def test_answered_questions_are_shown_as_answered(filled):
     form = node_form(filled, node_id=filled.ids["base"])
     values = [radio.value for radio in form.select(pn.widgets.RadioBoxGroup)]
     assert values == ["supplier", "whole"]
+
+
+def test_steps_follow_the_setup(session):
+    from lca4pd.app.main import steps
+    session.new_project("P")
+    assert [label for _, label in steps(session.project)] == [
+        "1  Setup", "2  Databases", "3  Transport and end-of-life pathways",
+        "4  Product and entries", "5  Full overview", "6  Calculate"]
+    session.project.set_toggle("scenarios", True)
+    assert steps(session.project)[4] == ("scenarios", "5  Scenarios")
+
+
+def test_scenarios_alternatives_and_links_show_up_in_the_screens(filled):
+    from lca4pd.app.views import scenarios as scenario_view
+    from lca4pd.app.views.tree import alternative_details, new_alternative_form
+    project = filled.project
+    scenario = project.add_scenario("Steel use")
+    parameter = project.add_parameter(scenario, "steel amount", best=0.9, worst=1.2)
+    project.link_parameter(parameter, "entry", filled.entries["production_input"])
+    project.link_parameter(parameter, "node_weight", filled.ids["base"])
+    leg = project.list_legs(filled.ids["supplier"])[0]["id"]
+    project.link_parameter(parameter, "pathway_leg", leg)
+    rows = scenario_view.affected(project, project.list_parameters()[0])
+    assert [(r["What"], r["Best"], r["Average"], r["Worst"]) for r in rows] == [
+        ("Amount of 'production input'", "0.945 kg", "1.05 kg", "1.26 kg"),
+        ("Weight", "0.9 kg", "1 kg", "1.2 kg"),
+        ("Distance by 'Lorry'", "90 km", "100 km", "120 km")]
+
+    alternative = project.create_alternative(filled.ids["base"], "Lighter base")
+    removed = project.create_alternative(filled.ids["base"], "No base", removed=True)
+    filled.changed()
+    for node in (alternative, removed, filled.ids["base"]):
+        filled.goto("tree", node=node)
+        assert shown(filled)
+    alternative_details(filled, alternative, lambda _id: None)
+    new_alternative_form(filled, filled.ids["base"], lambda _id: None)
+    for step in ("scenarios", "overview"):
+        filled.goto(step)
+        assert shown(filled)
+
+
+def test_forms_offer_the_parameters_only_with_scenarios_on(filled):
+    project = filled.project
+    scenario = project.add_scenario("S")
+    project.add_parameter(scenario, "x", best=0.9, worst=1.1)
+    form = entry_form(filled, filled.ids["base"], "production_input", None, lambda: None)
+    assert len(form.select(pn.widgets.MultiChoice)) == 1
+    project.set_toggle("scenarios", False)
+    form = entry_form(filled, filled.ids["base"], "production_input", None, lambda: None)
+    assert len(form.select(pn.widgets.MultiChoice)) == 0

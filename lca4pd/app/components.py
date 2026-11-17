@@ -243,3 +243,34 @@ def unit_select(unit: str | None, value: str | None = None, name: str = "Unit"):
     if current and current not in options:
         options = [current, *options]
     return W.Select(name=name, options=options, value=current, width=110, disabled=not options)
+
+
+class ParameterField:
+    """'Affected by': which scenario parameters act on an amount, weight or price.
+
+    Shown only when scenarios are switched on. Parameters are picked from the
+    existing ones; they are defined in the step 'Scenarios'.
+    """
+
+    def __init__(self, session, target_type: str, target_id=None, label="Affected by"):
+        project = session.project
+        self.session, self.target_type = session, target_type
+        self.widget, self.view = None, None
+        if not project.toggles["scenarios"]:
+            return
+        scenarios = {s["id"]: s["name"] for s in project.list_scenarios()}
+        options = {f"{scenarios[p['scenario_id']]} – {p['name']}": p["id"]
+                   for p in project.list_parameters()}
+        if not options:
+            self.view = note(f"*{label}:* no scenario parameters are defined yet "
+                             "(step 'Scenarios').")
+            return
+        current = project.links_for(target_type, target_id) if target_id else []
+        self.widget = W.MultiChoice(name=f"{label} (scenario parameters)", options=options,
+                                    value=current, sizing_mode="stretch_width",
+                                    placeholder="none – the same in best, average and worst case")
+        self.view = self.widget
+
+    def save(self, target_id: int) -> None:
+        if self.widget is not None:
+            self.session.project.set_links(self.target_type, target_id, self.widget.value)

@@ -3,9 +3,10 @@
 import pandas as pd
 import panel as pn
 
+from ...model.diff import diff_alternative
 from ...model.tree import Tree
-from ..components import (W, alert, answer, card, confirm_button, guarded, heading, note,
-                          question, table)
+from ..components import (ParameterField, W, alert, answer, card, confirm_button, guarded,
+                          heading, note, question, table)
 from .entries import entries_panel
 from .pathways import new_pathway_form
 
@@ -23,8 +24,8 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
     toggles = project.toggles
     node = project.get_node(node_id) if node_id else {}
     creating = node_id is None
-    is_root = (creating and parent_id is None) or (not creating and node["parent_id"] is None
-                                                   and node["alternative_of"] is None)
+    # The product, and an alternative of the whole product, sit at the top of the tree.
+    is_root = (creating and parent_id is None) or (not creating and node["parent_id"] is None)
     if creating:
         if parent_id is None:
             asks = {"production_site": False, "use": project.stage_by_role("use") is not None,
@@ -73,9 +74,16 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
                         if total is not None else
                         f" The weight including sub-elements is not complete yet "
                         f"({len(missing)} element(s) without weight).")
+    weight_parameters = ParameterField(session, "node_weight", node_id, label="Weight affected by")
+    price_parameters = ParameterField(session, "node_price", node_id, label="Price affected by")
     basics = [pn.Row(name, quantity), pn.Row(label, number, price),
               pn.Row(weight, pn.Column(pn.Spacer(height=18), is_total)),
-              note(weight_help), description]
+              note(weight_help)]
+    if weight_parameters.view is not None:
+        basics.append(weight_parameters.view)
+    if toggles["cost"] and price_parameters.view is not None:
+        basics.append(price_parameters.view)
+    basics.append(description)
 
     # ---- pathway selectors
     def pathway_select(kind, current, reason, label_text, allow_exclude=True):
@@ -207,6 +215,9 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
             else:
                 project.update_node(node_id, **fields)
                 result["id"] = node_id
+            weight_parameters.save(result["id"])
+            if toggles["cost"]:
+                price_parameters.save(result["id"])
 
         if guarded(session, action, messages):
             session.saved("Element created" if creating else "Saved")
@@ -226,8 +237,72 @@ def node_form(session, node_id=None, parent_id=None, on_done=None):
     return pn.Column(*basics, *questions, messages, pn.Row(*buttons), sizing_mode="stretch_width")
 
 
+def alternative_details(session, alternative_id: int, on_done):
+    """Name and descriptions of a design alternative."""
+    project = session.project
+    node = project.get_node(alternative_id)
+    local = pn.Column()
+    label = W.TextInput(name="Name of the alternative", value=node["alt_label"] or "", width=360)
+    short = W.TextInput(name="Short description", value=node["alt_short_description"] or "",
+                        sizing_mode="stretch_width")
+    long = W.TextAreaInput(name="Long description", value=node["alt_long_description"] or "",
+                           height=110, sizing_mode="stretch_width")
+    save = W.Button(name="Save", button_type="primary", width=120)
+
+    def do_save(event):
+        if guarded(session, lambda: project.update_node(
+                alternative_id, alt_label=label.value, alt_short_description=short.value,
+                alt_long_description=long.value), local):
+            session.saved()
+            session.changed()
+            on_done(alternative_id)
+
+    save.on_click(do_save)
+    return pn.Column(label, short, long, local, save, sizing_mode="stretch_width")
+
+
+def new_alternative_form(session, base_id: int, on_done):
+    project = session.project
+    base = project.get_node(base_id)
+    local = pn.Column()
+    label = W.TextInput(name="Name of the alternative", width=360,
+                        placeholder="e.g. Aluminium housing")
+    short = W.TextInput(name="Short description", sizing_mode="stretch_width")
+    long = W.TextAreaInput(name="Long description (optional)", height=90,
+                           sizing_mode="stretch_width")
+    start = W.RadioBoxGroup(options={
+        f"A copy of '{base['name']}' as it is now, to change afterwards": "copy",
+        "An empty element, to build from scratch": "empty",
+        f"Nothing: this redesign removes '{base['name']}'": "removed"}, value="copy")
+    create = W.Button(name="Create alternative", button_type="primary", width=180)
+    cancel = W.Button(name="Cancel", width=100)
+
+    def do_create(event):
+        made = {}
+
+        def action():
+            made["id"] = project.create_alternative(
+                base_id, label.value_input or label.value, copy=start.value == "copy",
+                removed=start.value == "removed", short_description=short.value,
+                long_description=long.value)
+
+        if guarded(session, action, local):
+            session.changed()
+            on_done(made["id"])
+
+    create.on_click(do_create)
+    cancel.on_click(lambda event: on_done(None))
+    return pn.Column(
+        note("An alternative is another version of this element and everything below it. It is "
+             "calculated against the base design, with the rest of the product unchanged. Later "
+             "changes to the base element are not carried over to the alternative."),
+        label, short, long, pn.pane.Markdown("**Start from**", margin=(10, 10, 0, 10)), start,
+        local, pn.Row(create, cancel), sizing_mode="stretch_width")
+
+
 def build(session):
     project = session.project
+    with_alternatives = project.toggles["alternatives"]
     collapsed: set[int] = session.__dict__.setdefault("collapsed_nodes", set())
     left = pn.Column(width=420)
     right = pn.Column(sizing_mode="stretch_width")
@@ -261,20 +336,28 @@ def build(session):
         status = statuses()
         below: set[int] = set()
         for node_id, level in status.items():
-            if level == "blocker":
-                below.update(a["id"] for a in tree.ancestors(node_id))
+            if level != "blocker":
+                continue
+            # Mark the elements above; inside an alternative, stop at the alternative itself.
+            current = tree.nodes[node_id]
+            while current["alternative_of"] is None and current["parent_id"] is not None:
+                current = tree.nodes[current["parent_id"]]
+                below.add(current["id"])
         rows, ids = [], []
 
         def add(node_id, depth):
             node = tree.nodes[node_id]
-            children = tree.children(node_id)
+            children = [] if node["is_removed"] else tree.children(node_id)
             mark = {"blocker": "⛔", "warning": "⚠️"}.get(status.get(node_id))
             if mark is None:
                 mark = "⛔" if node_id in below else "✅"
             elif status.get(node_id) == "warning" and node_id in below:
                 mark = "⛔"
-            text = node["name"]
-            if node["quantity"] != 1:
+            if node["alternative_of"] is not None:
+                text = f"⇄ {node['alt_label']}" + (" (removed)" if node["is_removed"] else "")
+            else:
+                text = node["name"]
+            if node["quantity"] != 1 and not node["is_removed"]:
                 text = f"{node['quantity']:g} × {text}"
             rows.append({"fold": ("▸" if node_id in collapsed else "▾") if children else "",
                          "Element": NBSP * 4 * depth + text, "Status": mark})
@@ -282,6 +365,9 @@ def build(session):
             if node_id not in collapsed:
                 for child in children:
                     add(child, depth + 1)
+            if with_alternatives and node["alternative_of"] is None:
+                for alternative in tree.alternatives(node_id):
+                    add(alternative, depth)
 
         add(tree.root_id, 0)
         state["ids"] = ids
@@ -302,8 +388,10 @@ def build(session):
             show_node()
 
         grid.on_click(clicked)
-        left[:] = [grid, note("⛔ something is still needed here or below · ⚠️ worth checking "
-                              "· ✅ complete")]
+        legend = "⛔ something is still needed here or below · ⚠️ worth checking · ✅ complete"
+        if with_alternatives:
+            legend += " · ⇄ design alternative of the element above it"
+        left[:] = [grid, note(legend)]
 
     def refresh(selected=None):
         if selected is not None:
@@ -324,19 +412,39 @@ def build(session):
         if node_id is None or node_id not in state["ids"]:
             node_id = session.selected_node = root["id"]
         node = project.get_node(node_id)
+        is_alternative = node["alternative_of"] is not None
 
         if state["mode"] == "add":
             right[:] = [heading(f"New sub-element of '{node['name']}'"),
                         node_form(session, parent_id=node_id,
                                   on_done=lambda new_id: refresh(new_id))]
             return
+        if state["mode"] == "alternative":
+            right[:] = [heading(f"New design alternative for '{node['name']}'"),
+                        new_alternative_form(session, node_id, refresh)]
+            return
 
         path = " › ".join([a["name"] for a in reversed(project.ancestors(node_id))] + [node["name"]])
-        add = W.Button(name="Add sub-element", button_type="primary", width=160)
-        add.on_click(lambda event: (state.update(mode="add"), show_node()))
-        actions = [add]
-        move_row = []
-        if node["parent_id"] is not None:
+        title = node["name"]
+        if is_alternative:
+            base = project.get_node(node["alternative_of"])
+            title = f"⇄ {node['alt_label']}"
+            path = f"Design alternative of '{base['name']}' ({path})"
+
+        def delete():
+            fallback = node["alternative_of"] or node["parent_id"]
+            project.delete_node(node_id)
+            session.changed()
+            refresh(fallback)
+
+        actions, move_row = [], []
+        if not node["is_removed"]:
+            add = W.Button(name="Add sub-element", button_type="primary", width=160)
+            add.on_click(lambda event: (state.update(mode="add"), show_node()))
+            actions.append(add)
+        if is_alternative:
+            actions.append(confirm_button("Delete alternative", delete, width=170))
+        elif node["parent_id"] is not None:
             copy = W.Button(name="Copy", width=90)
 
             def duplicate(event):
@@ -346,16 +454,15 @@ def build(session):
                     refresh(made["id"])
 
             copy.on_click(duplicate)
-
-            def delete():
-                parent = node["parent_id"]
-                project.delete_node(node_id)
-                session.changed()
-                refresh(parent)
-
             subtree = set(project._subtree_ids(node_id))
-            targets = {project.get_node(i)["name"] + f"  (#{i})": i for i in state["ids"]
-                       if i not in subtree and i != node["parent_id"]}
+            targets = {}
+            for other in state["ids"]:
+                candidate = project.get_node(other)
+                if other in subtree or other == node["parent_id"] or candidate["is_removed"]:
+                    continue
+                name = (f"⇄ {candidate['alt_label']}" if candidate["alternative_of"] is not None
+                        else candidate["name"])
+                targets[f"{name}  (#{other})"] = other
             actions += [copy, confirm_button("Delete", delete, width=170)]
             if targets:
                 target = W.Select(options=targets, width=230)
@@ -368,20 +475,37 @@ def build(session):
 
                 move.on_click(do_move)
                 move_row = [move, target]
+        if with_alternatives and not is_alternative and not project.in_alternative(node_id):
+            alternative = W.Button(name="Add design alternative", width=190)
+            alternative.on_click(lambda event: (state.update(mode="alternative"), show_node()))
+            actions.append(alternative)
 
         def entries_changed():
             session.focus = {"tab": "entries"}
             show_node()
 
-        entries = entries_panel(session, node_id, on_changed=entries_changed)
-        count = len(project.list_entries(node_id))
-        tabs = pn.Tabs(("Element", node_form(session, node_id=node_id, on_done=refresh)),
-                       (f"Entries ({count})", entries),
-                       active=1 if session.focus.get("entry") or session.focus.get("tab") == "entries"
-                       else 0, sizing_mode="stretch_width")
+        tabs = []
+        if not node["is_removed"]:
+            entries = entries_panel(session, node_id, on_changed=entries_changed)
+            count = len(project.list_entries(node_id))
+            tabs += [("Element", node_form(session, node_id=node_id, on_done=refresh)),
+                     (f"Entries ({count})", entries)]
+        if is_alternative:
+            lines = diff_alternative(project, node_id)
+            differences = (pn.pane.Markdown("\n".join(f"- {line}" for line in lines))
+                           if lines else
+                           alert("This alternative is identical to the base element so far.",
+                                 "warning"))
+            tabs += [("About this alternative", alternative_details(session, node_id, refresh)),
+                     (f"Differences from the base ({len(lines)})", pn.Column(
+                         note("What this alternative changes, compared with the base element "
+                              "as it is now."), differences))]
+        active = 1 if (session.focus.get("entry") or session.focus.get("tab") == "entries") \
+            and not node["is_removed"] else 0
         session.focus = {}
-        right[:] = [pn.pane.Markdown(f"### {node['name']}\n{path}", margin=(0, 10)),
-                    pn.Row(*actions), pn.Row(*move_row), tabs]
+        right[:] = [pn.pane.Markdown(f"### {title}\n{path}", margin=(0, 10)),
+                    pn.Row(*actions), pn.Row(*move_row),
+                    pn.Tabs(*tabs, active=active, sizing_mode="stretch_width")]
 
     def on_change():
         show_tree()

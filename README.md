@@ -25,5 +25,5 @@ To check a database file without starting the tool:
 Run the tests with `pip install -r requirements-dev.txt` and `python -m pytest`.
 
 Built so far: data model and checks, database import, calculation, and the guided
-interface up to the calculation. Still to come: scenarios, design alternatives and the
-full-table view in the interface, and the report on the new results.
+interface including scenarios, design alternatives and the full overview table. Still to
+come: the report on the new results.

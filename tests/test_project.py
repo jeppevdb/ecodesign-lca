@@ -309,3 +309,49 @@ def test_alternative_follows_its_base_when_moved(lamp):
     alt = p.create_alternative(lamp.shade, "Glass")
     p.move_node(lamp.shade, lamp.lamp)
     assert p.get_node(alt)["parent_id"] == lamp.lamp
+
+
+# ------------------------------------------------- links and differences
+
+def test_set_links_makes_exactly_these_parameters_act(lamp):
+    p = lamp.p
+    scenario = p.add_scenario("S")
+    a = p.add_parameter(scenario, "a", best=0.9, worst=1.1)
+    b = p.add_parameter(scenario, "b", best=0.8, worst=1.2)
+    p.set_links("entry", lamp.base_steel, [a, b])
+    assert p.links_for("entry", lamp.base_steel) == [a, b]
+    p.set_links("entry", lamp.base_steel, [b])
+    assert p.links_for("entry", lamp.base_steel) == [b]
+    p.set_links("node_weight", lamp.base, [a])
+    assert p.links_for("node_weight", lamp.base) == [a]
+
+
+def test_differences_of_an_alternative(lamp):
+    from lca4pd.model.diff import diff_alternative
+    p = lamp.p
+    alt = p.create_alternative(lamp.housing, "Lighter housing")
+    assert diff_alternative(p, alt) == []
+    alt_base, alt_shade = (c["id"] for c in p.children(alt))
+    p.update_node(alt_base, weight=0.6)
+    p.update_entry(p.list_entries(alt_base)[0]["id"], amount=0.63)
+    p.delete_node(alt_shade)
+    glass = p.add_node(alt, "Glass shade", weight=0.3)
+    p.add_entry(alt, "exclusion", description="Paint", exclusion_reason="tiny")
+    assert diff_alternative(p, alt) == [
+        "Housing: added entry Paint",
+        "Housing › Base: Weight 1 kg → 0.6 kg",
+        "Housing › Base: Steel: amount 1.05 kg → 0.63 kg",
+        "Housing: removed element Shade",
+        "Housing: added element Glass shade",
+    ]
+    assert glass
+    removed = p.create_alternative(lamp.shade, "No shade", removed=True)
+    assert diff_alternative(p, removed) == ["Shade: the element is removed"]
+
+
+def test_difference_names_a_changed_dataset(lamp):
+    from lca4pd.model.diff import diff_alternative
+    p = lamp.p
+    alt = p.create_alternative(lamp.base, "Plastic base")
+    p.update_entry(p.list_entries(alt)[0]["id"], dataset_ref_id=lamp.plastic)
+    assert diff_alternative(p, alt) == ["Base: Steel: dataset steel → plastic"]

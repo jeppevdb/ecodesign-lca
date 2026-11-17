@@ -1,9 +1,9 @@
 # Tool 2.0 – agreed design
 
-Status: design agreed step by step with the project owner. Build steps 1–4 are
+Status: design agreed step by step with the project owner. Build steps 1–5 are
 implemented, with tests in `tests/`: data model and checks (`lca4pd/model`), database import
 (`lca4pd/databases`, `lca4pd/method`), calculation (`lca4pd/calculation`) and the guided
-interface up to the calculation (`lca4pd/app`).
+interface with scenarios, design alternatives and the full overview (`lca4pd/app`).
 This document is the reference for implementation. Section 12 lists what is still open.
 
 ## 1. Goals
@@ -413,9 +413,43 @@ missing-items panel on the left, the current step on the right.
 - Optional fields (pedigree, GHG Protocol, EN 15804, price, internal number) appear only
   when switched on in Setup.
 
-Not in the interface yet: scenarios and parameters, design alternatives, the full LCI
-overview table (all build step 5), and the report (step 6). Design alternatives that exist
-in a project are not shown in the tree yet.
+Scenarios, design alternatives and the full overview were added in build step 5
+(section 20).
 
 Checked by driving the application in a browser from a new project to a calculated result
 with the real BAFU file, and by tests that build every screen (`tests/test_app.py`).
+
+## 20. Build step 5 – scenarios, alternatives and the full overview, as built
+
+**Scenarios** (step shown only when switched on in Setup)
+- A scenario has a name, a description and parameters. A parameter has best and worst
+  multipliers (average is always 1) and a written assumption per case.
+- Parameters are linked from where the value is entered: an "affected by" pick-list on
+  entries (amount), pathway legs (distance or share) and elements (weight, and price when
+  cost is on).
+- The scenario page lists everything each parameter affects with its best, average and
+  worst value, each with a link to where it is entered. A parameter that affects nothing is
+  flagged.
+
+**Design alternatives** (when switched on)
+- "Add design alternative" on any element outside an alternative: start from a copy, from
+  an empty element, or as a removal.
+- Alternatives appear in the tree under the element they replace, marked ⇄, and are edited
+  like any element. Extra tabs hold the name and descriptions, and the differences from
+  the base element, worked out automatically (`lca4pd/model/diff.py`).
+
+**Full overview** (always available)
+- *As entered:* one row per entry in tree order. Description, stage, amount, note and the
+  switched-on classification columns are editable in the cell, with the same checks as the
+  forms; a refused value is put back with the reason shown. Datasets are changed through the
+  search dialog (🔍); ↗ opens the entry form. Filter under each heading, sort, group, tick
+  rows and set one pick-list value for all of them, export to Excel.
+- *As calculated:* the full inventory behind one design, scenario setting and market, with
+  quantities multiplied through and pathways expanded; read-only, export to Excel with all
+  16 categories. If the project changed since the last calculation it is calculated first.
+- Negative amounts can only be confirmed in the entry form, not in the table.
+
+Checked in the browser on a demo project: creating a scenario and parameter, linking it
+from an entry, creating an alternative and seeing its differences, editing and refusing
+values in the table (also after sorting), a bulk edit of ticked rows after sorting, the
+calculated view and the calculation of all designs, settings and markets.

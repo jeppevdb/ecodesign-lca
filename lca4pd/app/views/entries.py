@@ -4,8 +4,8 @@ import pandas as pd
 import panel as pn
 
 from ...model.classifications import ENTRY_TYPE_LABELS
-from ..components import (ClassificationFields, DatasetField, W, alert, answer, guarded,
-                          note, question, table, unit_select)
+from ..components import (ClassificationFields, DatasetField, ParameterField, W, alert,
+                          answer, guarded, note, question, table, unit_select)
 
 _HELP = {
     "production_input": "A material, component, energy or service that goes into making this "
@@ -132,6 +132,13 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
         widgets["exclusion_reason"] = reason
         parts.append(reason)
 
+    parameters = None
+    if entry_type != "exclusion":
+        parameters = ParameterField(session, "entry", entry.get("id"),
+                                    label="Amount affected by")
+        if parameters.view is not None:
+            parts.append(parameters.view)
+
     classification = None
     if entry_type not in ("cost", "exclusion"):
         classification = ClassificationFields(session, entry)
@@ -167,6 +174,8 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
             if per_market:
                 for market_id, field in market_fields.items():
                     project.set_market_dataset(entry_id, market_id, field.value)
+            if parameters is not None:
+                parameters.save(entry_id)
 
         if guarded(session, action, local):
             session.saved()

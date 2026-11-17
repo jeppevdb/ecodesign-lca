@@ -7,8 +7,8 @@ import pandas as pd
 import panel as pn
 
 from ...model import units
-from ..components import (ClassificationFields, DatasetField, W, alert, card, confirm_button,
-                          guarded, heading, note, table)
+from ..components import (ClassificationFields, DatasetField, ParameterField, W, alert, card,
+                          confirm_button, guarded, heading, note, table)
 
 _INTRO = {
     "gate_to_customer": "How the finished product travels from your gate to the customer, for "
@@ -49,6 +49,8 @@ def pathway_editor(session, pathway_id: int, on_change=None):
         note_input = W.TextInput(name="Note (optional)", value=leg.get("note") or "",
                                  sizing_mode="stretch_width")
         classification = ClassificationFields(session, leg)
+        parameters = ParameterField(session, "pathway_leg", leg.get("id"),
+                                    label="Share affected by" if is_eol else "Distance affected by")
         if is_eol:
             amount = W.FloatInput(name="Share of the weight (%)", width=200,
                                   value=None if leg.get("amount") is None else leg["amount"] * 100)
@@ -72,10 +74,12 @@ def pathway_editor(session, pathway_id: int, on_change=None):
                 fields["amount"], fields["unit"] = amount.value, unit.value
 
             def action():
-                if leg.get("id"):
-                    project.update_leg(leg["id"], confirm_negative=confirm.value, **fields)
+                leg_id = leg.get("id")
+                if leg_id:
+                    project.update_leg(leg_id, confirm_negative=confirm.value, **fields)
                 else:
-                    project.add_leg(pathway_id, confirm_negative=confirm.value, **fields)
+                    leg_id = project.add_leg(pathway_id, confirm_negative=confirm.value, **fields)
+                parameters.save(leg_id)
 
             if guarded(session, action, local):
                 done()
@@ -87,6 +91,8 @@ def pathway_editor(session, pathway_id: int, on_change=None):
         save_button.on_click(save)
         cancel.on_click(lambda event: form_area.clear())
         parts = [dataset.view, inputs, note_input]
+        if parameters.view is not None:
+            parts.append(parameters.view)
         if classification.view is not None:
             parts.append(classification.view)
         form_area[:] = [pn.Column(*parts, confirm, local, pn.Row(save_button, cancel),

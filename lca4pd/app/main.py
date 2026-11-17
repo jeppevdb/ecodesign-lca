@@ -12,19 +12,26 @@ import panel as pn
 
 from .components import LEFT_STYLE, W
 from .session import Session
-from .views import calculate, databases, issues, pathways, setup, start, tree
+from .views import (calculate, databases, issues, overview, pathways, scenarios, setup, start,
+                    tree)
 
 ACCENT = "#4099da"
 
-STEPS = [
-    ("setup", "1  Setup"),
-    ("databases", "2  Databases"),
-    ("pathways", "3  Transport and end-of-life pathways"),
-    ("tree", "4  Product and entries"),
-    ("calculate", "5  Calculate"),
-]
 VIEWS = {"start": start.build, "setup": setup.build, "databases": databases.build,
-         "pathways": pathways.build, "tree": tree.build, "calculate": calculate.build}
+         "pathways": pathways.build, "tree": tree.build, "scenarios": scenarios.build,
+         "overview": overview.build, "calculate": calculate.build}
+
+
+def steps(project) -> list[tuple[str, str]]:
+    """The steps shown for a project; optional ones appear when switched on in Setup."""
+    names = [("setup", "Setup"), ("databases", "Databases"),
+             ("pathways", "Transport and end-of-life pathways"),
+             ("tree", "Product and entries")]
+    if project.toggles["scenarios"]:
+        names.append(("scenarios", "Scenarios"))
+    names += [("overview", "Full overview"), ("calculate", "Calculate")]
+    return [(step, f"{number}  {label}") for number, (step, label) in enumerate(names, start=1)]
+
 
 def create_app(workspace):
     pn.extension("tabulator", "filedropper", notifications=True)
@@ -44,7 +51,7 @@ def create_app(workspace):
             return
         title.object = f"### {session.project.get_setting('name')}"
         buttons = []
-        for step, label in STEPS:
+        for step, label in steps(session.project):
             button = W.Button(name=label, sizing_mode="stretch_width", stylesheets=[LEFT_STYLE],
                               button_type="primary" if step == session.step else "default")
             button.on_click(lambda event, step=step: session.goto(step))

@@ -29,6 +29,8 @@ def target_of(session, issue) -> tuple[str, dict]:
     elif issue.target_type == "pathway_leg":
         leg = session.project._row("pathway_leg", issue.target_id)
         focus = {"pathway": leg["pathway_id"]}
+    elif issue.target_type in ("parameter", "scenario"):
+        focus = {issue.target_type: issue.target_id}
     if step not in session.views:
         step = "setup"
     return step, focus

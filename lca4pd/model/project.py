@@ -958,6 +958,19 @@ class Project:
         return self._insert("scenario", {"name": name,
                                          "description": _text(description, "description")})
 
+    def update_scenario(self, scenario_id: int, *, name: str | None = None,
+                        description: str | None = None) -> None:
+        self._row("scenario", scenario_id)
+        changes = {}
+        if name is not None:
+            name = _text(name, "name", required=True)
+            if self._rows("SELECT id FROM scenario WHERE name = ? AND id != ?", (name, scenario_id)):
+                raise ValidationError(f"A scenario named '{name}' already exists.", "name")
+            changes["name"] = name
+        if description is not None:
+            changes["description"] = _text(description, "description")
+        self._update("scenario", scenario_id, changes)
+
     def remove_scenario(self, scenario_id: int) -> None:
         self._row("scenario", scenario_id)
         self._delete("scenario", scenario_id)
@@ -1025,6 +1038,21 @@ class Project:
                 "DELETE FROM parameter_link WHERE parameter_id = ? AND target_type = ?"
                 " AND target_id = ?", (parameter_id, target_type, target_id),
             )
+
+    def links_for(self, target_type: str, target_id: int) -> list[int]:
+        """Ids of the parameters acting on an entry, pathway leg, node weight or node price."""
+        rows = self._rows(
+            "SELECT parameter_id FROM parameter_link WHERE target_type = ? AND target_id = ?"
+            " ORDER BY parameter_id", (target_type, target_id))
+        return [row["parameter_id"] for row in rows]
+
+    def set_links(self, target_type: str, target_id: int, parameter_ids) -> None:
+        """Make exactly these parameters act on a target."""
+        wanted, current = set(parameter_ids), set(self.links_for(target_type, target_id))
+        for parameter_id in wanted - current:
+            self.link_parameter(parameter_id, target_type, target_id)
+        for parameter_id in current - wanted:
+            self.unlink_parameter(parameter_id, target_type, target_id)
 
     def parameter_links(self, parameter_id: int | None = None) -> list[dict]:
         if parameter_id is None:
