@@ -3,6 +3,7 @@
 import pandas as pd
 import panel as pn
 
+from ...model import units
 from ...model.classifications import ENTRY_TYPE_LABELS
 from ..components import (ClassificationFields, DatasetField, ParameterField, W, alert,
                           answer, guarded, note, question, table, unit_select)
@@ -37,13 +38,17 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
         value=entry.get("description") or "", sizing_mode="stretch_width")
     parts.append(description)
 
-    unit_holder = pn.Row()
-    state = {"unit": None}
+    # One unit field for the whole life of the form, updated in place when the
+    # dataset changes (swapping in a new field is not reliably redrawn by browsers).
+    unit_field = W.Select(name="Unit", options=[], width=110, disabled=True)
+    unit_holder = pn.Row(unit_field)
+    state = {"unit": unit_field}
 
     def set_unit(dataset_unit, current=None):
-        widget = unit_select(dataset_unit, current)
-        state["unit"] = widget
-        unit_holder[:] = [widget]
+        fresh = unit_select(dataset_unit, current)
+        unit_field.options = fresh.options
+        unit_field.value = fresh.value
+        unit_field.disabled = fresh.disabled
 
     # ---- life-cycle stage
     stage = None
@@ -82,7 +87,7 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
 
         def market_picked(ref):
             first = next((f.unit() for f in market_fields.values() if f.value), None)
-            if state["unit"] is None or not state["unit"].options:
+            if not unit_field.options:
                 set_unit(first)
 
         for market in markets:
@@ -158,8 +163,17 @@ def entry_form(session, node_id: int, entry_type: str, entry: dict | None, on_do
         per_market = entry_type == "use" and use_kind.value == "markets"
         if entry_type not in ("cost", "exclusion"):
             fields["dataset_ref_id"] = None if per_market else dataset.value
-            if state["unit"] is not None and state["unit"].value:
-                fields["unit"] = state["unit"].value
+            if unit_field.value:
+                fields["unit"] = unit_field.value
+            chosen = [dataset.value] if not per_market else [
+                f.value for f in market_fields.values() if f.value]
+            for ref_id in chosen:
+                ref_unit = project.get_dataset_ref(ref_id)["unit"]
+                if unit_field.value and not units.compatible(unit_field.value, ref_unit):
+                    set_unit(ref_unit)
+                    local[:] = [alert(f"The unit was changed to {ref_unit} to match the chosen "
+                                      "dataset. Check the amount, then save again.", "warning")]
+                    return
 
         def action():
             if editing:

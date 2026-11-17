@@ -231,3 +231,51 @@ def test_forms_offer_the_parameters_only_with_scenarios_on(filled):
     project.set_toggle("scenarios", False)
     form = entry_form(filled, filled.ids["base"], "production_input", None, lambda: None)
     assert len(form.select(pn.widgets.MultiChoice)) == 0
+
+
+def test_unit_follows_a_changed_dataset_in_a_copied_alternative(filled):
+    """Reported: after copying an element as an alternative, changing an entry's dataset
+    left the unit as it was."""
+    from lca4pd.app.components import DatasetField
+    project = filled.project
+    project.set_toggle("scenarios", False)
+    alternative = project.create_alternative(filled.ids["base"], "Other base")
+    entry = next(e for e in project.list_entries(alternative) if e["type"] == "production_input")
+    form = entry_form(filled, alternative, "production_input", entry, lambda: None)
+    unit = next(w for w in form.select(pn.widgets.Select) if w.name == "Unit")
+    assert unit.value == "kg"
+    power = next(r["id"] for r in project.list_dataset_refs(1) if r["unit"] == "kWh")
+    pickers = [w for w in form.select(pn.widgets.Button) if w.name == "Search…"]
+    assert len(pickers) == 1
+    # choose the electricity dataset the way the search dialog does
+    import gc
+    dataset_field = [o for o in gc.get_objects() if isinstance(o, DatasetField)
+                     and o.view in form.select(pn.Row)][-1]
+    dataset_field.set(power)
+    assert unit is next(w for w in form.select(pn.widgets.Select) if w.name == "Unit")
+    assert unit.value == "kWh" and "MJ" in unit.options
+    save = next(b for b in form.select(pn.widgets.Button) if b.name == "Save entry")
+    save.clicks += 1
+    stored = project.get_entry(entry["id"])
+    assert (stored["dataset_ref_id"], stored["unit"]) == (power, "kWh")
+    original = project.get_entry(filled.entries["production_input"])
+    assert original["unit"] == "kg"                       # the base entry is untouched
+
+
+def test_a_unit_that_does_not_fit_the_dataset_is_corrected_before_saving(filled):
+    project = filled.project
+    entry = project.get_entry(filled.entries["production_input"])
+    form = entry_form(filled, entry["node_id"], "production_input", entry, lambda: None)
+    import gc
+    from lca4pd.app.components import DatasetField
+    dataset_field = [o for o in gc.get_objects() if isinstance(o, DatasetField)
+                     and o.view in form.select(pn.Row)][-1]
+    power = next(r["id"] for r in project.list_dataset_refs(1) if r["unit"] == "kWh")
+    dataset_field.value = power                      # dataset changed, unit field left behind
+    save = next(b for b in form.select(pn.widgets.Button) if b.name == "Save entry")
+    save.clicks += 1
+    assert project.get_entry(entry["id"])["dataset_ref_id"] != power   # not saved yet
+    unit = next(w for w in form.select(pn.widgets.Select) if w.name == "Unit")
+    assert unit.value == "kWh"
+    save.clicks += 1
+    assert project.get_entry(entry["id"])["unit"] == "kWh"
